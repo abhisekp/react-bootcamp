@@ -2,4 +2,4 @@
 
 https://tylermcginnis.com/free-react-bootcamp/
 
-### Check out the project at https://react-bootcamp.glitch.me/
+### Check out the project at <https://react-bootcamp.glitch.me/>
