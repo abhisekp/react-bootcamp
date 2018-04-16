@@ -30,15 +30,19 @@ function fetchPopularRepos(language = 'all') {
 
 /* eslint-disable camelcase */
 const Repo = ({
-  name, html_url, owner: { login } = {}, stargazers_count,
+  name, html_url, owner: { login } = {}, stargazers_count, id,
 }) => (
-  <ul>
-    <li>
-      <a href={html_url}>{name}</a>
-    </li>
-    <li>{login}</li>
-    <li>{stargazers_count} stars</li>
-  </ul>
+  <div className="shadow rounded pr-3">
+    <ul>
+      <li>
+        <a id={`url-${id}`} href={html_url} target="_blank" rel="noopener noreferrer">
+          {name}
+        </a>
+      </li>
+      <li>{login}</li>
+      <li>{stargazers_count} stars</li>
+    </ul>
+  </div>
 );
 /* eslint-enable camelcase */
 
@@ -148,36 +152,44 @@ class App extends React.Component {
     const { repos, loading, selectedLanguage } = this.state;
 
     return (
-      <Container>
-        <Nav>
-          {map(
-            lang => (
-              <NavItem key={lang}>
-                <NavLink href={`#${lang}`} onClick={() => this.handleLangSelect(lang)}>
-                  {lang}
-                </NavLink>
-              </NavItem>
-            ),
-            languages,
-          )}
-        </Nav>
-        <div>
-          <h1 className="text-center">{selectedLanguage}</h1>
-          <Row>
-            {loading || (!loading && size(repos) === 0) ? (
-              <Loading />
-            ) : (
-              map(
-                repoInfo => (
-                  <Col xs="auto" key={repoInfo.id}>
-                    <Repo {...repoInfo} />
-                  </Col>
+      <Container fluid>
+        <Row>
+          <Col xs="3" className="sticky-top">
+            <Nav pills>
+              {map(
+                lang => (
+                  <NavItem key={lang}>
+                    <NavLink
+                      disabled={lang === selectedLanguage}
+                      href={`#${lang}`}
+                      onClick={() => this.handleLangSelect(lang)}
+                    >
+                      {lang}
+                    </NavLink>
+                  </NavItem>
                 ),
-                repos,
-              )
-            )}
-          </Row>
-        </div>
+                languages,
+              )}
+            </Nav>
+          </Col>
+          <Col xs={{size: 9, offset: 3}}>
+            <h1 className="text-center">{selectedLanguage}</h1>
+            <Row>
+              {loading || (!loading && size(repos) === 0) ? (
+                <Loading />
+              ) : (
+                map(
+                  repoInfo => (
+                    <Col xs="auto" key={repoInfo.id}>
+                      <Repo {...repoInfo} />
+                    </Col>
+                  ),
+                  repos,
+                )
+              )}
+            </Row>
+          </Col>
+        </Row>
       </Container>
     );
   }

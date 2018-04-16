@@ -4,7 +4,8 @@
   "rules": {
     "react/no-multi-comp": "off",
     "react/react-in-jsx-scope": "off",
-    "react/jsx-filename-extension": "off"
+    "react/jsx-filename-extension": "off",
+    "react/prop-types": "off"
   },
   "env": {
     "browser": true
