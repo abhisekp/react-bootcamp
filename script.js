@@ -1,33 +1,46 @@
-const { CancelToken } = axios;
+/* global React,ReactDOM, _, axios, Reactstrap */
 
-function fetchMoreFriends() {
+const { CancelToken } = axios;
+const {
+  size, includes, map, first,
+} = _;
+const {
+  Progress, Container, Row, Col, Nav, NavItem, NavLink,
+} = Reactstrap;
+
+function fetchPopularRepos(language = 'all') {
   const source = CancelToken.source();
-  const requestMoreFriendsPromise = axios.get(
-    'http://www.mocky.io/v2/5ad32e812d000065105c9773',
-    {
-      cancelToken: source.token,
-    }
-  );
+  const encodedURI = encodeURI(`https://api.github.com/search/repositories?q=stars:>1+language:${language}&sort=stars&order=desc&type=Repositories`);
+
+  const requestPromise = axios.get(encodedURI, {
+    cancelToken: source.token,
+    timeout: 10e3,
+  });
 
   const fn = async () => {
     const {
-      data: { data },
-    } = await requestMoreFriendsPromise;
-    const newFriends = data.map(friend => new Friend(friend));
-    return newFriends;
+      data: { items: popularRepos },
+    } = await requestPromise;
+    return popularRepos;
   };
   fn.cancel = source.cancel;
 
   return fn;
 }
 
-class Friend {
-  constructor({ name = '', active = true, deleted = false } = {}) {
-    this.name = name;
-    this.active = active;
-    this.deleted = deleted;
-  }
-}
+/* eslint-disable camelcase */
+const Repo = ({
+  name, html_url, owner: { login } = {}, stargazers_count,
+}) => (
+  <ul>
+    <li>
+      <a href={html_url}>{name}</a>
+    </li>
+    <li>{login}</li>
+    <li>{stargazers_count} stars</li>
+  </ul>
+);
+/* eslint-enable camelcase */
 
 class Loading extends React.Component {
   static originalText = 'Loading';
@@ -37,7 +50,8 @@ class Loading extends React.Component {
   };
 
   componentDidMount() {
-    const stopper = this.state.text + '...';
+    this.timeStart = Date.now();
+    const stopper = `${this.state.text}...`;
 
     this.loadingId = setInterval(() => {
       if (this.state.text === stopper) {
@@ -46,7 +60,7 @@ class Loading extends React.Component {
         });
       } else {
         this.setState(({ text }) => ({
-          text: text + '.',
+          text: `${text}.`,
         }));
       }
     }, 300);
@@ -57,135 +71,64 @@ class Loading extends React.Component {
   }
 
   render() {
-    return <h2>{this.state.text}</h2>;
+    const progressVal = ((Date.now() - this.timeStart) / 3e3 * 1e2) % 1e2;
+
+    return (
+      <Progress striped bar color="success" value={progressVal}>
+        {this.state.text}
+      </Progress>
+    );
   }
 }
 
-const FriendsList = ({
-  list,
-  onRemoveFriend,
-  onDeactivateFriend,
-  onActivateFriend,
-  loading = false,
-}) => {
-  const activeFriends = list.filter(friend => friend.active);
-  const inactiveFriends = list.filter(friend => !friend.active);
-
-  return loading ? (
-    <Loading />
-  ) : (
-    <div>
-      <h1>Active Friends</h1>
-      <ul>
-        {activeFriends.map(({ name }) => (
-          <li key={name}>
-            <span>
-              <b>{name}</b>
-            </span>
-            <button onClick={() => onRemoveFriend(name)}>Remove</button>
-            <button onClick={() => onDeactivateFriend(name)}>Deactivate</button>
-          </li>
-        ))}
-      </ul>
-      <h1>Inactive Friends</h1>
-      <ul>
-        {inactiveFriends.map(({ name, deleted }) => (
-          <li key={name}>
-            {deleted ? (
-              <span>
-                <em>
-                  <del>{name}</del>
-                </em>
-              </span>
-            ) : (
-              <span>{name}</span>
-            )}
-            <button onClick={() => onRemoveFriend(name)}>Remove</button>
-            <button onClick={() => onActivateFriend(name)}>Activate</button>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-};
+const languages = ['all', 'javascript', 'ruby', 'python'];
 
 class App extends React.Component {
   state = {
-    friends: [],
-    input: '',
+    repos: [],
     loading: true,
+    selectedLanguage: first(languages),
   };
 
-  handleAddFriend() {
-    this.setState(({ input, friends }) => ({
-      friends: friends.concat(new Friend({ name: input })),
-      input: '',
-    }));
+  async componentDidMount() {
+    console.log('--componentDidMount--');
+
+    if (typeof this.popularReposFn === 'function') {
+      this.popularReposFn.cancel();
+    }
+    this.popularReposFn = fetchPopularRepos();
+
+    const newRepos = await this.popularReposFn();
+
+    // eslint-disable-next-line react/no-did-mount-set-state
+    this.setState({
+      loading: false,
+      repos: newRepos,
+    });
   }
 
-  handleRemoveFriend = name => {
-    this.setState(({ friends }) => ({
-      friends: friends.map(
-        friend =>
-          friend.name === name
-            ? new Friend({ ...friend, deleted: true, active: false })
-            : friend
-      ),
-    }));
-  };
+  handleLangSelect = async (lang) => {
+    if (lang === this.state.selectedLanguage || !includes(lang, languages)) {
+      return;
+    }
 
-  handleInput = ev => {
-    const { value } = ev.target;
-    this.setState({
-      input: value,
-    });
-  };
-
-  handleSubmit = ev => {
-    ev.preventDefault();
-    this.handleAddFriend();
-  };
-
-  handleToggleActiveFriend = (name, active) => {
-    this.setState(({ friends }) => {
-      const newFriends = friends.map(
-        friend =>
-          friend.name === name
-            ? new Friend({
-                ...friend,
-                active: typeof active === 'boolean' ? active : !friend.active,
-              })
-            : friend
-      );
-
-      return {
-        friends: newFriends,
-      };
-    });
-  };
-
-  handleClearAll = () => {
-    this.setState({
-      friends: [],
-    });
-  };
-
-  handleResetAll = async () => {
     this.setState({
       loading: true,
+      repos: [],
+      selectedLanguage: lang,
     });
 
     if (
-      typeof this.moreFriends === 'function' &&
-      typeof this.moreFriends.cancel === 'function'
+      typeof this.popularReposFn === 'function' &&
+      typeof this.popularReposFn.cancel === 'function'
     ) {
-      this.moreFriends.cancel('Cancelled by reset');
+      this.popularReposFn.cancel('Cancelled by new language selection');
     }
-    this.moreFriends = fetchMoreFriends();
+    this.popularReposFn = fetchPopularRepos(lang);
 
-    let newFriends = [];
+    let newRepos = [];
     try {
-      newFriends = await this.moreFriends();
+      newRepos = await this.popularReposFn();
     } catch (error) {
       if (axios.isCancel(error)) {
         console.error(error.message);
@@ -194,69 +137,48 @@ class App extends React.Component {
       }
     }
 
-    this.setState(({ friends }) => ({
+    this.setState({
       loading: false,
-      friends: newFriends,
-    }));
+      repos: newRepos,
+    });
   };
-
-  async componentDidMount() {
-    console.log('--componentDidMount--');
-
-    if (typeof this.moreFriends === 'function') {
-      this.moreFriends.cancel();
-    }
-    this.moreFriends = fetchMoreFriends();
-
-    const newFriends = await this.moreFriends();
-
-    this.setState(({ friends }) => ({
-      loading: false,
-      friends: newFriends,
-    }));
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    console.log('--componentDidUpdate--');
-  }
-
-  componentWillUnmount() {
-    console.log('--componentWillUnmount--');
-  }
 
   render() {
     console.log('--render--');
-    const { friends, loading, input } = this.state;
+    const { repos, loading, selectedLanguage } = this.state;
 
     return (
-      <div>
-        <form onSubmit={this.handleSubmit}>
-          <input
-            value={input}
-            onChange={this.handleInput}
-            placeholder="new friend"
-            disabled={loading}
-          />
-          <button disabled={loading}>Add Friend</button>
-          <button type="button" onClick={this.handleResetAll}>
-            Reset
-          </button>
-        </form>
-
-        {!loading && friends.length === 0 ? (
-          <h3>Please fetch more friends</h3>
-        ) : (
-          <FriendsList
-            list={friends}
-            onRemoveFriend={this.handleRemoveFriend}
-            onActivateFriend={name => this.handleToggleActiveFriend(name, true)}
-            onDeactivateFriend={name =>
-              this.handleToggleActiveFriend(name, false)
-            }
-            loading={loading}
-          />
-        )}
-      </div>
+      <Container>
+        <Nav>
+          {map(
+            lang => (
+              <NavItem key={lang}>
+                <NavLink href={`#${lang}`} onClick={() => this.handleLangSelect(lang)}>
+                  {lang}
+                </NavLink>
+              </NavItem>
+            ),
+            languages,
+          )}
+        </Nav>
+        <div>
+          <h1 className="text-center">{selectedLanguage}</h1>
+          <Row>
+            {loading || (!loading && size(repos) === 0) ? (
+              <Loading />
+            ) : (
+              map(
+                repoInfo => (
+                  <Col xs="auto" key={repoInfo.id}>
+                    <Repo {...repoInfo} />
+                  </Col>
+                ),
+                repos,
+              )
+            )}
+          </Row>
+        </div>
+      </Container>
     );
   }
 }

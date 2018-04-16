@@ -1,0 +1,13 @@
+{
+  "root": true,
+  "parser": "babel-eslint",
+  "rules": {
+    "react/no-multi-comp": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/jsx-filename-extension": "off"
+  },
+  "env": {
+    "browser": true
+  },
+  "extends": "airbnb"
+}
